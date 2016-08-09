@@ -16,6 +16,9 @@ limitations under the License.
 
 package org.moe.gradle.task
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.moe.common.utils.OsUtils
 import org.moe.common.variant.ModeVariant
 import org.moe.gradle.BasePlugin
@@ -81,27 +84,26 @@ class Dex extends BaseTask {
     def doDx() {
 
         if (OsUtils.windows) {
-            project.javaexec {
-                args '-DJXmx4096m'
-
-                main "-jar"
-                args "${getDxExec().absolutePath}"
-                prepareArgumentsList().each { args it }
-
-                // Fail build if dex fails
-                setIgnoreExitValue false
-
-                // Set logging
-                FileOutputStream ostream = new FileOutputStream(getLog());
-                setErrorOutput(ostream)
-                setStandardOutput(ostream)
-            }
+//            project.javaexec {
+//                args '-DJXmx4096m'
+//
+//                main "-jar"
+//                args "${getDxExec().absolutePath}"
+//                prepareArgumentsList().each { args it }
+//
+//                // Fail build if dex fails
+//                setIgnoreExitValue false
+//
+//                // Set logging
+//                FileOutputStream ostream = new FileOutputStream(getLog());
+//                setErrorOutput(ostream)
+//                setStandardOutput(ostream)
+//            }
         } else {
             project.exec {
                 // Set executable
                 executable = getDxExec()
 
-                args '-JXmx4096m'
                 prepareArgumentsList().each { args it }
 
                 // Fail build if dex fails
@@ -118,30 +120,61 @@ class Dex extends BaseTask {
     public def prepareArgumentsList() {
         Collection<String> args = []
 
-        // Set mode
-        args.add('--dex')
+        // Set output
+        args.add("${getDestJar().absolutePath}")
 
         // Set options
         if (debug) {
-            args.add('--debug')
+            args.add('-g')
         }
 
         args.add('--verbose')
+        args.add('WARNING')
         args.add('--multi-dex')
-        args.add('--core-library')
+        args.add('NATIVE')
+        args.add('-D')
+        args.add('jack.android.min-api-level=24')
 
         // Set extra arguments
         for (String extra : getExtraArgs()) {
             args.add(extra)
         }
 
-        // Set output
-        args.add("--output=${getDestJar().absolutePath}")
-
         // Set inputs
-        getInputFiles().each { args.add(it.absolutePath) }
-        getLibraries().each { args.add(it.absolutePath) }
+        getInputFiles().each {
+            args.add('--import')
+            args.add(jarForPath(it.absolutePath))
+        }
+        getLibraries().each {
+            args.add('--import')
+            args.add(jarForPath(it.absolutePath))
+        }
         args
+    }
+
+    // TODO: A temporal workaround for jack not beeng able to handle input directories containing
+    // Java class files. We create jars from those input directories and pass them to jack instead.
+    public String jarForPath(String path) {
+        File file = new File(path);
+        if (file.isDirectory()) {
+            File temp = Files.createTempDirectory(null).toFile();
+            temp.deleteOnExit();
+            file = new File(temp, "input.jar")
+
+            project.exec {
+                // Set executable
+                commandLine 'bash', '-c', "cd ${path}; zip -r ${file.absolutePath} ."
+
+                // Fail build if dex fails
+                setIgnoreExitValue false
+
+                // Set logging
+                FileOutputStream ostream = new FileOutputStream(getLog());
+                setErrorOutput(ostream)
+                setStandardOutput(ostream)
+            }
+        }
+        return file.absolutePath;
     }
 
     public static String getTaskName(SourceSet sourceSet, ModeVariant modeVariant) {

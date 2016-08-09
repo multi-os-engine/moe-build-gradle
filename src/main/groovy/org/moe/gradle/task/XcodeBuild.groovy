@@ -233,14 +233,11 @@ class XcodeBuild extends BaseTask {
         // Add dependencies
         def supported = targetVariant.getArchitectureVariants().findAll { architectureVariant ->
             String family = architectureVariant.familyName
-            Dex2OatDefaults.getDefaultBaseForArchFamily(family) != Dex2OatDefaults.UNDEFINED_BASE_DEFAULT
         }
         supported.each { architectureVariant ->
             String xcodeProviderTaskName = XcodeProvider.getTaskName(sourceSet, modeVariant, architectureVariant,
                     targetVariant)
             XcodeProvider xcodeProvider = project.tasks.getByName(xcodeProviderTaskName)
-            oatFiles.add(xcodeProvider.getOatFile())
-            imageFiles.add(xcodeProvider.getImageFileLink())
 
             xcodebuildTask.dependsOn xcodeProvider
         }

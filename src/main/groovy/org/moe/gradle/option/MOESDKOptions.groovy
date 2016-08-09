@@ -56,7 +56,7 @@ public class MOESDKOptions {
     }
 
     public File getDxExec() {
-        moeSDK == null ? null : moeSDK.tools.dxExec()
+        moeSDK == null ? null : new File(moeSDK.tools.dxExec().getParentFile(), "jack");
     }
 
     public File getDex2OatExec() {
@@ -77,10 +77,6 @@ public class MOESDKOptions {
         } else {
             moeSDK == null ? null : moeSDK.tools.proGuardCfg()
         }
-    }
-
-    public File getPreloadedClasses() {
-        moeSDK == null ? null : moeSDK.tools.preloadedClasses()
     }
 
     public File getUITransformerJar() {

@@ -20,7 +20,7 @@ import org.gradle.api.tasks.Input
 
 class Dex2OatOptions {
 
-    private static final List<String> BACKENDS = ['Quick', 'Optimizing']
+    private static final List<String> BACKENDS = ['Optimizing']
 
     @Input
     private String compilerBackend = BACKENDS[0]

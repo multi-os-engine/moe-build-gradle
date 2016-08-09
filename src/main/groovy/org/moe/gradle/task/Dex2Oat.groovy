@@ -29,7 +29,12 @@ import org.gradle.api.tasks.*
 
 class Dex2Oat extends BaseTask {
 
-    static String NAME = "Dex2Oat"
+    static final String NAME = "Dex2Oat"
+    static final String NATIVE_LIB_NAME = "natives.a"
+    static final String DEX2OAT_LOG_NAME = "dex2oat.log"
+    static final String AR_LOG_NAME = "ar.log"
+    static final String NATIVE_INTERMEDIATES_NAME = "intermediates"
+
 
     /*
 	Task inputs
@@ -37,12 +42,6 @@ class Dex2Oat extends BaseTask {
 
     @Input
     String archFamily
-
-    @Input
-    long base
-
-    @InputFile
-    File imageClasses
 
     @Input
     boolean isDebug
@@ -61,13 +60,20 @@ class Dex2Oat extends BaseTask {
      */
 
     @OutputFile
-    File destImage
+    File destNativeLib
 
     @OutputFile
-    File destOat
+    File dex2oatLog
 
     @OutputFile
-    File log
+    File arLog
+
+    /*
+    Task intermediates
+    */
+
+    @OutputDirectory
+    File nativeLibIntermediates;
 
     /*
 	Task action
@@ -77,17 +83,19 @@ class Dex2Oat extends BaseTask {
     void taskAction() {
         project.logger.debug("|--- $name : $NAME ---|")
         project.logger.debug("|< archFamily: ${getArchFamily()}")
-        project.logger.debug("|< base: ${getBase()}")
-        project.logger.debug("|< imageClasses: ${getImageClasses()}")
         project.logger.debug("|< inputFiles: ${getInputFiles()}")
         project.logger.debug("|< dex2oatExec: ${getDex2oatExec()}")
         project.logger.debug("|< dex2oatOptions: ${getDex2oatOptions()}")
-        project.logger.debug("|> destImage: ${getDestImage()}")
-        project.logger.debug("|> destOat: ${getDestOat()}")
-        project.logger.debug("|> log: ${getLog()}")
+        project.logger.debug("|> destNativeLib: ${getDestNativeLib()}")
+        project.logger.debug("|> dex2oatLog: ${getDex2oatLog()}")
+        project.logger.debug("|> arLog: ${getArLog()}")
 
-        securedLoggableAction(getLog()) {
+        securedLoggableAction(getDex2oatLog()) {
             doDex2Oat()
+        }
+
+        securedLoggableAction(getArLog()) {
+            doAr()
         }
     }
 
@@ -98,7 +106,6 @@ class Dex2Oat extends BaseTask {
 
             // Set target options
             args "--instruction-set=${getArchFamily()}"
-            args "--base=0x${Long.toHexString(getBase())}"
 
             // Set compiler backend
             args "--compiler-backend=${getDex2oatOptions().getCompilerBackend()}"
@@ -111,9 +118,7 @@ class Dex2Oat extends BaseTask {
             }
 
             // Set files
-            args "--image=${getDestImage().absolutePath}"
-            args "--image-classes=${getImageClasses().absolutePath}"
-            args "--oat-file=${getDestOat().absolutePath}"
+            args "--native-output=${getNativeLibIntermediates().absolutePath}"
 
             // Set inputs
             StringBuilder dexFiles = new StringBuilder();
@@ -129,7 +134,34 @@ class Dex2Oat extends BaseTask {
             setIgnoreExitValue false
 
             // Set logging
-            FileOutputStream ostream = new FileOutputStream(getLog());
+            FileOutputStream ostream = new FileOutputStream(getDex2oatLog());
+            setErrorOutput(ostream)
+            setStandardOutput(ostream)
+        }
+    }
+
+    def doAr() {
+        // Link the object files together
+        project.exec {
+            // Set executable
+            executable = "ar"
+
+            // Set commands
+            args "-rcs"
+
+            // Set target library
+            args "${getDestNativeLib().absolutePath}"
+
+            // Set source object files
+            project.fileTree(dir: getNativeLibIntermediates(), include: '*.o').each {
+                args "${it.absolutePath}"
+            }
+
+            // Fail build if dex fails
+            setIgnoreExitValue false
+
+            // Set logging
+            FileOutputStream ostream = new FileOutputStream(getArLog());
             setErrorOutput(ostream)
             setStandardOutput(ostream)
         }
@@ -146,7 +178,7 @@ class Dex2Oat extends BaseTask {
         final String PATTERN = "${BasePlugin.MOE}${ELEMENTS_DESC}${TASK_NAME}"
 
         // Add rule
-        project.tasks.addRule("Pattern: $PATTERN: Creates art and oat files."
+        project.tasks.addRule("Pattern: $PATTERN: Creates native static library file."
                 , { String taskName ->
             project.logger.info("Evaluating for $TASK_NAME rule: $taskName")
 
@@ -179,7 +211,7 @@ class Dex2Oat extends BaseTask {
         // Create task
         final String taskName = getTaskName(sourceSet, modeVariant, archFamily)
         Dex2Oat dex2oatTask = project.tasks.create(taskName, Dex2Oat.class)
-        dex2oatTask.description = "Generates art+oat files ($outPath)."
+        dex2oatTask.description = "Generates native static library file ($outPath/${NATIVE_LIB_NAME})."
         dex2oatTask.dex2oatOptions = project.moe.dex2oatOptions
         dex2oatTask.archFamily = archFamily
 
@@ -188,13 +220,10 @@ class Dex2Oat extends BaseTask {
         Dex dexTask = (Dex) project.tasks.getByName(dexTaskName)
         dex2oatTask.dependsOn dexTask
 
+        // Set intermediate directory
+        dex2oatTask.nativeLibIntermediates = project.file("${project.buildDir}/${outPath}/${NATIVE_INTERMEDIATES_NAME}")
+
         // Update convention mapping
-        dex2oatTask.conventionMapping.base = {
-            Dex2OatDefaults.getDefaultBaseForArchFamily(dex2oatTask.getArchFamily())
-        }
-        dex2oatTask.conventionMapping.imageClasses = {
-            sdk.getPreloadedClasses()
-        }
         dex2oatTask.conventionMapping.inputFiles = {
             def files = [
                     dexTask.outputs.files.find {
@@ -212,14 +241,14 @@ class Dex2Oat extends BaseTask {
         dex2oatTask.conventionMapping.dex2oatExec = {
             sdk.getDex2OatExec()
         }
-        dex2oatTask.conventionMapping.destImage = {
-            project.file("${project.buildDir}/${outPath}/image.art")
+        dex2oatTask.conventionMapping.destNativeLib = {
+            project.file("${project.buildDir}/${outPath}/${NATIVE_LIB_NAME}")
         }
-        dex2oatTask.conventionMapping.destOat = {
-            project.file("${project.buildDir}/${outPath}/application.oat")
+        dex2oatTask.conventionMapping.dex2oatLog = {
+            project.file("${project.buildDir}/${outPath}/${DEX2OAT_LOG_NAME}")
         }
-        dex2oatTask.conventionMapping.log = {
-            project.file("${project.buildDir}/${outPath}/dex2oat.log")
+        dex2oatTask.conventionMapping.arLog = {
+            project.file("${project.buildDir}/${outPath}/${AR_LOG_NAME}")
         }
         dex2oatTask.conventionMapping.isDebug = {
             modeVariant.isDebug()

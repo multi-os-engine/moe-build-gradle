@@ -43,16 +43,10 @@ class XcodeProvider extends BaseTask {
 	 */
 
 	@InputFile
-	File oatFile
-
-	@InputFile
-	File imageFile
+	File nativeLib
 
 	@OutputFile
-	File oatFileLink
-
-	@OutputFile
-	File imageFileLink
+	File nativeLibLink
 
 	/*
 	Task action
@@ -62,13 +56,10 @@ class XcodeProvider extends BaseTask {
 	void taskAction() {
 		this.inputs
 		project.logger.debug("|--- $name : $NAME ---|")
-		project.logger.debug("|< oatFile: ${getOatFile()}")
-		project.logger.debug("|< imageFile: ${getImageFile()}")
-		project.logger.debug("|> oatFileLink: ${getOatFileLink()}")
-		project.logger.debug("|> imageFileLink: ${getImageFileLink()}")
+		project.logger.debug("|< nativeLib: ${getNativeLib()}")
+		project.logger.debug("|> nativeLibLink: ${getNativeLibLink()}")
 
-		copy(getOatFile(), getOatFileLink())
-		copy(getImageFile(), getImageFileLink())
+		copy(getNativeLib(), getNativeLibLink())
 	}
 
 	private void copy(File from, File to) {
@@ -107,7 +98,7 @@ class XcodeProvider extends BaseTask {
 		final String PATTERN = "${BasePlugin.MOE}${ELEMENTS_DESC}${TASK_NAME}"
 
 		// Add rule
-		project.tasks.addRule("Pattern: $PATTERN: Creates art and oat files."
+		project.tasks.addRule("Pattern: $PATTERN: Creates native static library file."
 				, { String taskName ->
 			project.logger.info("Evaluating for $TASK_NAME rule: $taskName")
 
@@ -174,19 +165,13 @@ class XcodeProvider extends BaseTask {
 		}
 
 		// Update convention mapping
-		providerTask.conventionMapping.oatFile = {
-			dex2oatTask.destOat
+		providerTask.conventionMapping.nativeLib = {
+			dex2oatTask.destNativeLib
 		}
-		providerTask.conventionMapping.imageFile = {
-			dex2oatTask.destImage
-		}
-		providerTask.conventionMapping.oatFileLink = {
-			project.file("${project.buildDir}/${outPath}/${arch.getArchName()}.oat")
-		}
-		providerTask.conventionMapping.imageFileLink = {
-			project.file("${project.buildDir}/${outPath}/${arch.getArchName()}.art")
+		providerTask.conventionMapping.nativeLibLink = {
+			project.file("${project.buildDir}/${outPath}/${arch.getArchName()}.a")
 		}
 
-		return providerTask
+			return providerTask
 	}
 }
