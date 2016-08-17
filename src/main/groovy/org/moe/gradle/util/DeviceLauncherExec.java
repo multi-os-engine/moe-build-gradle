@@ -24,16 +24,18 @@ import java.nio.file.InvalidPathException;
 
 public class DeviceLauncherExec extends AbstractJarExec {
 
-    static final File LAUNCHER_FILE;
-    static final File WORKING_DIR;
+    static final File LAUNCHER_FILE = null;
+    static final File WORKING_DIR = null;
 
     static {
-        try {
-            LAUNCHER_FILE = new File(MOESDK.SDK_TOOLS_PATH + File.separator + MOESDK.IOS_DEVICE_JAR);
-            WORKING_DIR = new File(MOESDK.SDK_TOOLS_PATH);
-        } catch (InvalidPathException e) {
-            throw new RuntimeException("Failed to load device launcher jar. " + e.getMessage());
-        }
+        System.err.println("this Gradle plugin is no longer supported");
+        System.exit(1);
+        // try {
+        //     LAUNCHER_FILE = new File(MOESDK.SDK_TOOLS_PATH + File.separator + MOESDK.IOS_DEVICE_JAR);
+        //     WORKING_DIR = new File(MOESDK.SDK_TOOLS_PATH);
+        // } catch (InvalidPathException e) {
+        //     throw new RuntimeException("Failed to load device launcher jar. " + e.getMessage());
+        // }
     }
 
     public DeviceLauncherExec() {
